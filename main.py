@@ -183,7 +183,7 @@ async def get_address_info(request: AddressRequest):
 			address_data["total_score"] = total_score
 			address_data["total_prime_cached"] = total_prime_cached
 			address_data["position"] = position
-			address_data["number_of_addresses"] = len(data)
+			address_data["total_users"] = len(data)
 			return address_data
 	return {"message": "Address not found"}
 
