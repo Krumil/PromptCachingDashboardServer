@@ -153,6 +153,7 @@ class AddressRequest(BaseModel):
 
 @app.post("/addresses")
 async def get_address_info(request: AddressRequest):
+    position = calculate_address_position(request.address)
     address = request.address
     with open("interacting_addresses.json", "r") as f:
         data = json.load(f)
@@ -181,6 +182,7 @@ async def get_address_info(request: AddressRequest):
                 total_prime_cached += address_data["base_prime_amount_cached"]
             address_data["total_score"] = total_score
             address_data["total_prime_cached"] = total_prime_cached
+            address_data["position"] = position
             return address_data
     return {"message": "Address not found"}
 
@@ -195,3 +197,40 @@ async def trigger_update_addresses(background_tasks: BackgroundTasks):
 def schedule_daily_update():
     scheduler.add_job(update_interacting_addresses, "interval", days=1)
     scheduler.start()
+
+
+def calculate_address_position(address):
+    # function that calculate the score of every address, sort them and return the position of the address
+    with open("interacting_addresses.json", "r") as f:
+        data = json.load(f)
+    total_score = 0
+    for info in data:
+        address_data = info["data"]
+        if info["address"].lower() == address.lower():
+            if "scores" in address_data:
+                total_score += (
+                    address_data["scores"]["prime_score"]
+                    + address_data["scores"]["community_score"]
+                    + address_data["scores"]["initialization_score"]
+                )
+            if "base_scores" in address_data:
+                total_score += (
+                    address_data["base_scores"]["prime_score"]
+                    + address_data["base_scores"]["community_score"]
+                    + address_data["base_scores"]["initialization_score"]
+                )
+            break
+
+    data = sorted(
+        data,
+        key=lambda x: x["data"]["scores"]["prime_score"]
+        + x["data"]["scores"]["community_score"]
+        + x["data"]["scores"]["initialization_score"],
+        reverse=True,
+    )
+
+    for i, info in enumerate(data):
+        if info["address"].lower() == address.lower():
+            return i + 1
+
+    return -1
