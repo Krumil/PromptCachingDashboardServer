@@ -235,3 +235,8 @@ def calculate_address_position(address):
 			return i + 1
 
 	return -1
+
+@app.post("/update_addresses")
+async def trigger_update_addresses(background_tasks: BackgroundTasks):
+    background_tasks.add_task(update_interacting_addresses)
+    return {"message": "Address update initiated"}
