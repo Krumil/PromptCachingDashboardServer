@@ -3,6 +3,7 @@ from ..config import web3
 
 async def fetch_logs_in_batches(contract_address, from_block, to_block, batch_size):
     all_logs = []
+    contract_address = web3.to_checksum_address(contract_address)
     for start_block in range(from_block, to_block + 1, batch_size):
         end_block = min(start_block + batch_size - 1, to_block)
         filter_params = {
