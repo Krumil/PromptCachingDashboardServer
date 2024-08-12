@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from ..services.blockchain import calculate_address_position
+from ..services.blockchain import calculate_addresses_position
 from ..models.request import AddressRequest
 import json
 
@@ -38,27 +38,39 @@ async def get_addresses():
 
 @router.post("/addresses")
 async def get_address_info(request: AddressRequest):
-    position = calculate_address_position(request.address)
-    address = request.address
+    total_score = 0
+    total_prime_cached = 0
+    total_users = 0
+    addresses_found = 0
+
     with open("interacting_addresses.json", "r") as f:
         data = json.load(f)
-    for info in data:
-        if info["address"].lower() == address.lower():
-            address_data = info["data"]
-            total_score = sum(
-                address_data.get("scores", {}).values()
-            ) + sum(
-                address_data.get("base_scores", {}).values()
-            )
-            total_prime_cached = (
-                address_data.get("prime_amount_cached", 0)
-                + address_data.get("base_prime_amount_cached", 0)
-            )
-            address_data.update({
-                "total_score": total_score,
-                "total_prime_cached": total_prime_cached,
-                "position": position,
-                "total_users": len(data),
-            })
-            return address_data
-    return {"message": "Address not found"}
+    
+    addresses_found = []
+    total_combined_score = 0
+    for address in request.addresses:
+        address_info = next((info for info in data if info["address"].lower() == address.lower()), None)
+        
+        if address_info:
+            address_data = address_info["data"]
+            address_score = sum(address_data.get("scores", {}).values()) + sum(address_data.get("base_scores", {}).values())
+            total_score += address_score
+            total_combined_score += address_score
+            total_prime_cached += address_data.get("prime_amount_cached", 0) + address_data.get("base_prime_amount_cached", 0)
+            addresses_found.append(address_info)
+    
+    total_users = len(data) - len(request.addresses) + 1
+    
+    if addresses_found:
+        position = calculate_addresses_position(request.addresses)
+        return {
+            "total_score": total_score,
+            "total_prime_cached": total_prime_cached,
+            "position": position,
+            "total_users": total_users,
+            "addresses_processed": len(request.addresses),
+            "addresses_found": addresses_found,
+            "addresses_not_found": len(request.addresses) - len(addresses_found)
+        }
+    else:
+        return {"message": "No addresses found"}
