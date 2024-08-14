@@ -6,12 +6,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime
 import json
 
-
 router = APIRouter()
+
+last_updated_file = "last_updated_date.json"
 
 def setup_driver():
     chrome_options = Options()
@@ -19,7 +19,7 @@ def setup_driver():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     
-    service = Service(ChromeDriverManager().install())
+    service = Service('/usr/local/bin/chromedriver')
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
@@ -38,7 +38,7 @@ async def check_website_update():
         last_updated_text = last_updated_element.text
         last_updated_date_wayfinder = datetime.strptime(last_updated_text.split()[-1], "%Y-%m-%d")
 
-        with open("last_updated_date.json", "r") as file:
+        with open(last_updated_file, "r") as file:
             data = json.load(file)
             last_updated_date_addresses_json = datetime.strptime(data["date"], "%Y-%m-%d")
         
@@ -46,7 +46,7 @@ async def check_website_update():
             await update_interacting_addresses()
             current_time = datetime.now().strftime("%H:%M:%S")
             data["times"].append(current_time)
-            with open("last_updated_date.json", "w") as file:
+            with open(last_updated_file, "w") as file:
                 json.dump(data, file)
         else:
             print(f"Website not updated today. Last update: {last_updated_date_addresses_json.date()}")
@@ -57,8 +57,17 @@ async def check_website_update():
     finally:
         driver.quit()
 
-
 @router.post("/update_addresses")
 async def trigger_update_addresses(background_tasks: BackgroundTasks):
     background_tasks.add_task(check_website_update)
     return {"message": "Address update initiated"}
+
+
+@router.get("/last_updated_date")
+async def get_last_updated_date():
+	try:
+		with open(last_updated_file, "r") as file:
+			data = json.load(file)
+		return {"last_updated_date": data}
+	except Exception as e:
+		return {"error": str(e)}
