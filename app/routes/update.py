@@ -10,6 +10,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime
 import json
 
+
 router = APIRouter()
 
 def setup_driver():
@@ -37,18 +38,13 @@ async def check_website_update():
         last_updated_text = last_updated_element.text
         last_updated_date_wayfinder = datetime.strptime(last_updated_text.split()[-1], "%Y-%m-%d")
 
-        try:
-            with open("last_updated_date.json", "r") as file:
-                data = json.load(file)
-                last_updated_date_addresses_json = datetime.strptime(data["date"], "%Y-%m-%d")
-        except (FileNotFoundError, json.JSONDecodeError):
-            data = {"date": datetime.min.strftime("%Y-%m-%d"), "times": []}
-            last_updated_date_addresses_json = datetime.min
+        with open("last_updated_date.json", "r") as file:
+            data = json.load(file)
+            last_updated_date_addresses_json = datetime.strptime(data["date"], "%Y-%m-%d")
         
         if last_updated_date_addresses_json.date() < last_updated_date_wayfinder.date():
             await update_interacting_addresses()
             current_time = datetime.now().strftime("%H:%M:%S")
-            data["date"] = last_updated_date_wayfinder.strftime("%Y-%m-%d")
             data["times"].append(current_time)
             with open("last_updated_date.json", "w") as file:
                 json.dump(data, file)
