@@ -38,6 +38,16 @@ async def get_interacting_addresses(contract_address, from_block, batch_size=100
     cache_data = [data for data in cache_data if data["data"] is not None]    
     logging.info(f"Retrieved cache data for {len(cache_data)} addresses")
     logging.info("Calculating and sorting addresses")
+
+    with open("original_interacting_addresses.json", "w") as f:
+        json.dump(cache_data, f, indent=4)
+
+    # for every cache_data item, check if "extra" is present and "primary_address_badge_data" is present
+    # if so, use that data, otherwise use the data from the cache_data item
+    for item in cache_data:
+        if "extra" in item["data"] and "primary_address_badge_data" in item["data"]["extra"]:
+            item["data"] = item["data"]["extra"]["primary_address_badge_data"]
+
     sorted_addresses_data = calculate_and_sort_addresses(cache_data)
     logging.info("Getting avatar count for sorted addresses")
     sorted_addresses_data = await get_avatar_count(sorted_addresses_data)
