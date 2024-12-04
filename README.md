@@ -54,43 +54,6 @@ project_root/
 - aiohttp
 - dotenv
 
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/fastapi-ethereum-interaction.git
-   cd fastapi-ethereum-interaction
-   ```
-
-2. Install the required dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Set up environment variables:
-
-   Create a `.env` file in the root directory and add any necessary environment variables. For example:
-
-   ```env
-   INFURA_API_KEY=your_infura_api_key
-   ```
-
-4. Add the ABI files:
-
-   Ensure that `staking_contract_abi.json` and `prime_token_abi.json` are present in the `abi/` directory.
-
-## Running the Application
-
-1. Start the FastAPI application:
-
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-
-2. The application will be available at `http://127.0.0.1:8000`.
-
 ## Endpoints
 
 ### Get Global Data
