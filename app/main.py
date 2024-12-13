@@ -5,11 +5,13 @@ from . import app
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://prime-maxi.com",
-        "https://*.app-paragonsdao-com.pages.dev/",
-        "https://paragonsdao.com",
-        "https://*.paragonsdao.com",
-        "localhost"
+        "http://localhost",           # Allow localhost without a port
+        "http://localhost:8000",      # Allow localhost on port 8000
+        "http://localhost:3000",      # Allow localhost on port 3000 (common for React dev servers)
+        "https://prime-maxi.com",     # Example production origin
+        "https://*.app-paragonsdao-com.pages.dev/",  # Wildcard subdomains
+        "https://paragonsdao.com",    # Specific domain
+        "https://*.paragonsdao.com"   # Wildcard subdomains
     ],
     allow_credentials=True,
     allow_methods=["*"],

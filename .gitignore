@@ -4,3 +4,8 @@
 .idea/
 node_modules/
 __pycache__/
+
+interacting_addresses.json
+original_interacting_addresses.json
+ens.json
+last_updated_date.json
