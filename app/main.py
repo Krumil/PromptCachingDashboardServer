@@ -4,7 +4,13 @@ from . import app
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://prime-maxi.com"],
+    allow_origins=[
+        "https://prime-maxi.com",
+        "https://*.app-paragonsdao-com.pages.dev/",
+        "https://paragonsdao.com",
+        "https://*.paragonsdao.com",
+        "localhost"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
