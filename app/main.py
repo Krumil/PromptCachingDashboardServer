@@ -11,6 +11,7 @@ app.add_middleware(
         "https://prime-maxi.com",
         "https://paragonsdao.com",
         "https://www.paragonsdao.com",
+        "https://app.paragonsdao.com"
     ],
     allow_origin_regex=r"https://.*\.app-paragonsdao-com\.pages\.dev",
     allow_credentials=True,
