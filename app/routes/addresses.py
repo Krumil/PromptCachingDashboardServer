@@ -63,6 +63,7 @@ async def get_address_info(request: AddressRequest):
     
     if addresses_found:
         position = calculate_addresses_position(request.addresses)
+        print(f"Calculated position: {position}")
         return {
             "total_score": total_score,
             "total_prime_cached": total_prime_cached,
@@ -73,4 +74,5 @@ async def get_address_info(request: AddressRequest):
             "addresses_not_found": len(request.addresses) - len(addresses_found)
         }
     else:
+        print("No addresses found")
         return {"message": "No addresses found"}
