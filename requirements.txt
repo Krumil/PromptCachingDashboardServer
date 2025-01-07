@@ -1,8 +1,9 @@
-aiohttp==3.9.5
-fastapi==0.112.0
-pydantic==2.8.2
+aiohttp==3.11.11
+APScheduler==3.10.4
+fastapi==0.115.6
+pydantic==2.10.4
 python-dotenv==1.0.1
-selenium==4.23.1
-uvicorn==0.30.6
+selenium==4.27.1
+uvicorn==0.34.0
 web3==6.3.0
-webdriver_manager==4.0.2
+apscheduler
