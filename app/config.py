@@ -1,7 +1,6 @@
 import json
 from web3 import Web3
-# from apscheduler.schedulers.background import BackgroundScheduler
-# from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from dotenv import load_dotenv
 from .constants import PROVIDER_URL, STAKING_CONTRACT_ADDRESS, PRIME_TOKEN_ADDRESS
@@ -25,11 +24,9 @@ prime_token_contract = web3.eth.contract(
     abi=prime_token_abi
 )
 
-# scheduler = BackgroundScheduler()
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     from .services.scheduler import schedule_daily_update, update_interacting_addresses
-#     schedule_daily_update()
-#     await update_interacting_addresses()
-#     yield
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from .services.scheduler import schedule_hourly_update, update_interacting_addresses
+    schedule_hourly_update()
+    await update_interacting_addresses()
+    yield

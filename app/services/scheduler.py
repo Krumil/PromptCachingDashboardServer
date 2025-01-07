@@ -1,7 +1,7 @@
 from ..constants import STAKING_CONTRACT_ADDRESS, STAKING_CONTRACT_ADDRESS_BASE, CREATION_BLOCK, BASE_CREATION_BLOCK
 from .blockchain import get_interacting_addresses_alchemy, calculate_and_sort_addresses, get_avatar_count
 from .cache import fetch_cache_data
-
+from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 import json
 import os
@@ -10,6 +10,8 @@ load_dotenv()
 
 ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
 assert ALCHEMY_API_KEY, "Please set ALCHEMY_API_KEY in your .env file."
+
+scheduler = BackgroundScheduler()
 
 # async def update_interacting_addresses():
 #     creation_block = 20019797
@@ -86,3 +88,8 @@ async def update_interacting_addresses():
         json.dump(sorted_addresses_data, f, indent=4)
 
     print("Successfully updated interacting_addresses.json with full data!")
+
+def schedule_hourly_update():
+    """Schedule the update_interacting_addresses function to run every hour"""
+    scheduler.add_job(update_interacting_addresses, 'interval', hours=1)
+    scheduler.start()
