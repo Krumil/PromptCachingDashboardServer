@@ -1,95 +1,111 @@
-from ..constants import STAKING_CONTRACT_ADDRESS, STAKING_CONTRACT_ADDRESS_BASE, CREATION_BLOCK, BASE_CREATION_BLOCK
-from .blockchain import get_interacting_addresses_alchemy, calculate_and_sort_addresses, get_avatar_count
-from .cache import fetch_cache_data
+from .blockchain import blockchain_service
+from .cache import cache_service
+from .logging_service import logging_service
+from .dune import dune_service
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 import json
-import os
+import datetime
 
 load_dotenv()
 
-ALCHEMY_API_KEY = os.getenv("ALCHEMY_API_KEY")
-assert ALCHEMY_API_KEY, "Please set ALCHEMY_API_KEY in your .env file."
+class SchedulerService:
+    def __init__(self):
+        self.scheduler = BackgroundScheduler()
+        self.ETH_NETWORK = "eth-mainnet"
+        self.BASE_NETWORK = "base-mainnet"
 
-scheduler = BackgroundScheduler()
+    async def update_interacting_addresses(self):
+        """
+        1) Fetch interacting addresses from Dune.
+        2) Fetch cache data for the addresses.
+        3) Add avatar count to the data.
+        4) Save to JSON.
+        5) Recalculate percentages and sort
+        6) Update ENS names
+        """
+        task_name = "update_interacting_addresses"
+        logging_service.start_timer(task_name)
+        
+        start_time = datetime.datetime.now()
+        await logging_service.log(f"🕒 Starting update at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        await logging_service.log("Step 1: Fetching interacting addresses from Dune...")
 
-# async def update_interacting_addresses():
-#     creation_block = 20019797
-#     base_creation_block = 15628915
-#     print("Updating addresses")
-#     addresses_base = await get_interacting_addresses(STAKING_CONTRACT_ADDRESS_BASE, base_creation_block)
-#     addresses = await get_interacting_addresses(STAKING_CONTRACT_ADDRESS, creation_block)
-#     addresses.update(addresses_base)
-#     with open("interacting_addresses.json", "w") as f:
-#         json.dump(addresses, f, indent=4)
-#     print("Addresses updated")
+        # Fetch addresses from Dune
+        merged_addresses = await dune_service.get_interacting_addresses()
+            
+        await logging_service.log(f"Dune returned {len(merged_addresses)} addresses.")
+
+        # Step 3: Fetch wayfinder data for the merged addresses
+        await logging_service.log("Fetching wayfinder data for addresses...")
+        wayfinder_data = await cache_service.fetch_wayfinder_data(list(merged_addresses))
+        valid_wayfinder_data = [item for item in wayfinder_data if item["data"] is not None]
+        await logging_service.log(f"Retrieved wayfinder data for {len(valid_wayfinder_data)} addresses (non-empty data).")
 
 
-ETH_NETWORK = "eth-mainnet"
-BASE_NETWORK = "base-mainnet"
+        # Step 4: Add avatar count to the data
+        await logging_service.log("Getting avatar count for addresses...")
+        valid_wayfinder_data = await blockchain_service.get_avatar_count(valid_wayfinder_data)
+
+        # Step 5: Recalculate percentages and sort
+        valid_wayfinder_data = blockchain_service.calculate_and_sort_addresses(valid_wayfinder_data)
 
 
-async def update_interacting_addresses():
-    """
-    1) Fetch interacting addresses from Base & Mainnet (via Alchemy).
-    2) Merge all addresses (remove duplicates).
-    3) Fetch cache data for the merged addresses in one shot.
-    4) Save the final data object to JSON (like the old code).
-    """
+        # Step 6: Update ENS names and recalculate percentages
+        await logging_service.log("\nStarting ENS names update...")
+        wayfinder_data_with_ens = await blockchain_service.add_ens_names(valid_wayfinder_data)
+        
+		# Save sorted data
+        with open("interacting_addresses.json", "w") as f:
+            json.dump(wayfinder_data_with_ens, f, indent=4)
+        
+        end_time = datetime.datetime.now()
+        duration = logging_service.end_timer(task_name)
+        await logging_service.log(
+            f"🏁 Update Summary:\n"
+            f"Started: {start_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Ended: {end_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Duration: {duration:.2f} seconds"
+        )
 
+    def schedule_daily_update(self):
+        """Schedule the update_interacting_addresses function to run once per day"""
+        self.scheduler.add_job(self.update_interacting_addresses, 'interval', days=1)
+        self.scheduler.start()
 
-    print("Step 1: Fetching interacting addresses from Base & Mainnet...")
+    def schedule_test_update(self, interval_seconds=300):
+        """
+        Schedule updates with a custom interval for testing purposes.
+        Default is 5 minutes (300 seconds).
+        """
+        self.scheduler.add_job(
+            self.update_interacting_addresses, 
+            'interval', 
+            seconds=interval_seconds,
+            next_run_time=datetime.datetime.now()  # Run immediately
+        )
+        self.scheduler.start()
+        return None
 
-    addresses_base = await get_interacting_addresses_alchemy(
-        BASE_NETWORK,
-        STAKING_CONTRACT_ADDRESS_BASE,
-        BASE_CREATION_BLOCK
-    )  # returns a set of addresses
+    def stop_scheduler(self):
+        """Stop the scheduler"""
+        self.scheduler.shutdown()
+        return "Scheduler stopped"
 
-    addresses_eth = await get_interacting_addresses_alchemy(
-        ETH_NETWORK,
-        STAKING_CONTRACT_ADDRESS,
-        CREATION_BLOCK
-    )  # also returns a set of addresses
+    def get_scheduler_status(self):
+        """Get the current status of the scheduler"""
+        jobs = self.scheduler.get_jobs()
+        status = {
+            "running": self.scheduler.running,
+            "job_count": len(jobs),
+            "jobs": [{
+                "id": job.id,
+                "name": job.name,
+                "next_run": job.next_run_time.strftime('%Y-%m-%d %H:%M:%S') if job.next_run_time else None,
+                "interval": str(job.trigger),
+            } for job in jobs]
+        }
+        return status
 
-    print(f"Base returned {len(addresses_base)} addresses.")
-    print(f"Ethereum returned {len(addresses_eth)} addresses.")
-
-    # Step 2: Merge and remove duplicates
-    merged_addresses = addresses_base.union(addresses_eth)
-    print(f"Merged total: {len(merged_addresses)} unique addresses.")
-
-    # Step 3: Fetch cache data for the merged addresses
-    print("Fetching cache data for merged addresses...")
-    cache_data = await fetch_cache_data(list(merged_addresses))
-    # Filter out any that have `data=None`
-    cache_data = [item for item in cache_data if item["data"] is not None]
-    print(f"Retrieved cache data for {len(cache_data)} addresses (non-empty data).")
-
-    # Optionally save the raw/unprocessed data:
-    with open("original_interacting_addresses.json", "w") as f:
-        json.dump(cache_data, f, indent=4)
-
-    # Step 4: Transform data if "extra" / "primary_address_badge_data" is present
-    for item in cache_data:
-        if "extra" in item["data"] and "primary_address_badge_data" in item["data"]["extra"]:
-            item["data"] = item["data"]["extra"]["primary_address_badge_data"]
-
-    # Now do your custom sorting
-    print("Calculating and sorting addresses...")
-    sorted_addresses_data = calculate_and_sort_addresses(cache_data)
-
-    print("Getting avatar count for sorted addresses...")
-    sorted_addresses_data = await get_avatar_count(sorted_addresses_data)
-
-    # Finally, save the *full object* (like the old code) to interacting_addresses.json
-    # You can choose the final name. If you only want the final sorted data, just dump that.
-    with open("interacting_addresses.json", "w") as f:
-        json.dump(sorted_addresses_data, f, indent=4)
-
-    print("Successfully updated interacting_addresses.json with full data!")
-
-def schedule_hourly_update():
-    """Schedule the update_interacting_addresses function to run every hour"""
-    scheduler.add_job(update_interacting_addresses, 'interval', hours=1)
-    scheduler.start()
+# Create a singleton instance
+scheduler_service = SchedulerService()

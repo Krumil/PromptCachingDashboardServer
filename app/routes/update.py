@@ -1,63 +1,37 @@
 from fastapi import APIRouter, BackgroundTasks
-from ..services.scheduler import update_interacting_addresses
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
+from ..services.scheduler import scheduler_service
+from ..services.blockchain import blockchain_service
 import json
 
 router = APIRouter()
 
-def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    
-    service = Service('/usr/local/bin/chromedriver')
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
-
-async def check_website_update():
-    url = "https://cache.wayfinder.ai/cache/account/0x8e5e01DCa1706F9Df683c53a6Fc9D4bb8D237153"
-    driver = setup_driver()
-    
-    try:
-        driver.get(url)
-        
-        # Wait for the element to be present (adjust the timeout as needed)
-        last_updated_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "p.text-white\\/70.text-2xs"))
-        )
-        
-        last_updated_text = last_updated_element.text
-        last_updated_date_wayfinder = datetime.strptime(last_updated_text.split()[-1], "%Y-%m-%d")
-
-        with open("last_updated_date.json", "r") as file:
-            data = json.load(file)
-            last_updated_date_addresses_json = datetime.strptime(data["date"], "%Y-%m-%d")
-        
-        if last_updated_date_addresses_json.date() < last_updated_date_wayfinder.date():
-            await update_interacting_addresses()
-            current_time = datetime.now().strftime("%H:%M:%S")
-            data["times"].append(current_time)
-            with open("last_updated_date.json", "w") as file:
-                json.dump(data, file)
-        else:
-            print(f"Website not updated today. Last update: {last_updated_date_addresses_json.date()}")
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    
-    finally:
-        driver.quit()
-
 @router.post("/update_addresses")
 async def trigger_update_addresses(background_tasks: BackgroundTasks):
-    background_tasks.add_task(update_interacting_addresses)
+    background_tasks.add_task(scheduler_service.update_interacting_addresses)
     return {"message": "Address update initiated"}
+
+@router.get("/update_ens")
+async def trigger_update_ens(background_tasks: BackgroundTasks):
+    background_tasks.add_task(blockchain_service.update_ens_names)
+    return {"message": "ENS update initiated"}
+
+
+@router.post("/recalculate_percentages")
+async def recalculate_percentages():
+    try:
+        # Load current data
+        with open("interacting_addresses.json", "r") as f:
+            data = json.load(f)
+        
+        # Recalculate percentages and sort
+        sorted_data = blockchain_service.calculate_and_sort_addresses(data)
+        
+        # Save updated data
+        with open("interacting_addresses.json", "w") as f:
+            json.dump(sorted_data, f, indent=4)
+        
+        return {"message": "Successfully recalculated percentages"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
