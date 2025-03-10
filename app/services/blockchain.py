@@ -131,31 +131,71 @@ class BlockchainService:
 	def calculate_and_sort_addresses(self, data):
 		logging.debug("Starting calculate_and_sort_addresses function")
 		
-		total_all_scores = sum(
-			sum(info.get("data", {}).get("merged_score_data", {}).values())
-			for info in data
-		)
+		total_all_scores = 0
+		for info in data:
+			if "data" in info and "merged_score_data" in info["data"]:
+				# Old format
+				merged_scores = info["data"]["merged_score_data"]
+				total_all_scores += sum(merged_scores.values())
+			elif "data" in info and "merged_boosted_referred_score_data" in info["data"]:
+				# New format
+				merged_scores = info["data"]["merged_boosted_referred_score_data"]
+				total_all_scores += sum(merged_scores.values())
+			elif "merged_boosted_referred_score_data" in info:
+				# Direct format
+				merged_scores = info["merged_boosted_referred_score_data"]
+				total_all_scores += sum(merged_scores.values())
+		
 		logging.debug(f"Total score for all addresses: {total_all_scores}")
 
 		for address_info in data:
-			merged_scores = address_info["data"].get("merged_score_data", {})
-			address_score = sum(merged_scores.values())
+			address_score = 0
+			if "data" in address_info and "merged_score_data" in address_info["data"]:
+				# Old format
+				merged_scores = address_info["data"]["merged_score_data"]
+				address_score = sum(merged_scores.values())
+			elif "data" in address_info and "merged_boosted_referred_score_data" in address_info["data"]:
+				# New format
+				merged_scores = address_info["data"]["merged_boosted_referred_score_data"]
+				address_score = sum(merged_scores.values())
+			elif "merged_boosted_referred_score_data" in address_info:
+				# Direct format
+				merged_scores = address_info["merged_boosted_referred_score_data"]
+				address_score = sum(merged_scores.values())
+				
 			percentage = (address_score / total_all_scores) * 100 if total_all_scores > 0 else 0
-			address_info["data"]["percentage"] = percentage
+			
+			# Store percentage in the appropriate location based on format
+			if "data" in address_info:
+				address_info["data"]["percentage"] = percentage
+			else:
+				address_info["percentage"] = percentage
+				
 			logging.debug(
-				f"Address {address_info['address']} - Score: {address_score}, Percentage: {percentage:.2f}%"
+				f"Address {address_info.get('address', '')} - Score: {address_score}, Percentage: {percentage:.2f}%"
 			)
 
+		# Sort based on score, handling both formats
 		sorted_data = sorted(
 			data,
-			key=lambda x: sum(x["data"].get("merged_score_data", {}).values()),
+			key=lambda x: (
+				sum(x["data"]["merged_score_data"].values()) if "data" in x and "merged_score_data" in x["data"]
+				else sum(x["data"]["merged_boosted_referred_score_data"].values()) if "data" in x and "merged_boosted_referred_score_data" in x["data"]
+				else sum(x["merged_boosted_referred_score_data"].values()) if "merged_boosted_referred_score_data" in x
+				else 0
+			),
 			reverse=True
 		)
 		
 		for index, address_info in enumerate(sorted_data):
-			address_info["data"]["position"] = index + 1
+			# Store position in the appropriate location based on format
+			if "data" in address_info:
+				address_info["data"]["position"] = index + 1
+			else:
+				address_info["position"] = index + 1
+				
 			logging.debug(
-				f"Address {address_info['address']} assigned position {index + 1}"
+				f"Address {address_info.get('address', '')} assigned position {index + 1}"
 			)
 
 		return sorted_data
@@ -166,25 +206,69 @@ class BlockchainService:
 		
 		if len(addresses) == 1:
 			for index, address_info in enumerate(data):
-				if address_info["address"].lower() == addresses[0].lower():
+				if address_info.get("address", "").lower() == addresses[0].lower():
 					return index + 1
 			return len(data)
 		else:
 			total_score = 0
 			for address in addresses:
 				address_info = next(
-					(info for info in data if info["address"].lower() == address.lower()),
+					(info for info in data if info.get("address", "").lower() == address.lower()),
 					None
 				)
 				if address_info:
-					total_score += sum(address_info["data"].get("merged_score_data", {}).values())
+					if "data" in address_info and "merged_score_data" in address_info["data"]:
+						# Old format
+						total_score += sum(address_info["data"]["merged_score_data"].values())
+					elif "merged_boosted_referred_score_data" in address_info:
+						# New format
+						total_score += sum(address_info["merged_boosted_referred_score_data"].values())
 			
-			higher_scores = sum(
-				1 for info in data
-				if sum(info["data"].get("merged_score_data", {}).values()) > total_score
-			)
+			higher_scores = 0
+			for info in data:
+				info_score = 0
+				if "data" in info and "merged_score_data" in info["data"]:
+					# Old format
+					info_score = sum(info["data"]["merged_score_data"].values())
+				elif "merged_boosted_referred_score_data" in info:
+					# New format
+					info_score = sum(info["data"]["merged_boosted_referred_score_data"].values())
+					
+				if info_score > total_score:
+					higher_scores += 1
 			
 			return higher_scores + 1
+
+	def verify_percentages_sum(self, data, tolerance=0.01):
+		"""
+		Verify that the sum of all percentages in the data equals 100% (within tolerance).
+		
+		Args:
+			data: List of address objects with percentage data
+			tolerance: Acceptable deviation from 100% (default: 0.01 which is 0.01%)
+			
+		Returns:
+			tuple: (is_valid, actual_sum, difference)
+				- is_valid: Boolean indicating if the sum is within tolerance of 100%
+				- actual_sum: The actual sum of all percentages
+				- difference: The difference between the actual sum and 100%
+		"""
+		total_percentage = 0.0
+		
+		for item in data:
+			if "data" in item and "percentage" in item["data"]:
+				total_percentage += item["data"]["percentage"]
+			elif "percentage" in item:
+				total_percentage += item["percentage"]
+		
+		difference = abs(100.0 - total_percentage)
+		is_valid = difference <= tolerance
+		
+		logging.debug(f"Sum of all percentages: {total_percentage:.4f}%")
+		logging.debug(f"Difference from 100%: {difference:.4f}%")
+		logging.debug(f"Is valid (within tolerance of {tolerance}%): {is_valid}")
+		
+		return is_valid, total_percentage, difference
 
 	async def get_avatar_count(self, addresses_data):
 		url = f"https://eth-mainnet.g.alchemy.com/nft/v3/{self.api_key}/getOwnersForContract"

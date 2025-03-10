@@ -16,7 +16,7 @@ async def trigger_update_ens(background_tasks: BackgroundTasks):
     return {"message": "ENS update initiated"}
 
 
-@router.post("/recalculate_percentages")
+@router.get("/recalculate_percentages")
 async def recalculate_percentages():
     try:
         # Load current data

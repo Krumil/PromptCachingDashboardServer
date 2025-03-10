@@ -8,7 +8,7 @@ load_dotenv()
 
 class DuneService:
     def __init__(self):
-        self.api_key = os.getenv("DUNE_API_KEY")
+        self.api_key = os.getenv("DUNE_API_KEY_1")
         assert self.api_key, "Please set DUNE_API_KEY in your .env file."
         self.dune = DuneClient(self.api_key)
         # self.QUERY_ID = 4665548  # The query ID for prime caching data

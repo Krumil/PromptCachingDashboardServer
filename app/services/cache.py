@@ -86,7 +86,13 @@ class CacheService:
                 async with session.get(api_url) as response:
                     if response.status == 200:
                         data = await response.json()
-                        return {"address": address, "data": data}
+                        # Check if the response is in the new format (flattened) or old format (nested)
+                        if isinstance(data, dict) and not "data" in data:
+                            # New format - data is already flattened
+                            return {"address": address, "data": data}
+                        else:
+                            # Old format or unexpected format - return as is
+                            return {"address": address, "data": data}
                     elif response.status == 429:  # Rate limit
                         response_text = await response.text()
                         await logging_service.add_error("Rate Limit", address, response_text)
